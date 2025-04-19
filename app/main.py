@@ -6,15 +6,39 @@ import hashlib
 import datetime
 from http.client import HTTPException
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
+from rate_limiter import RateLimiter
 from starlette.responses import RedirectResponse
+from fastapi.responses import JSONResponse
 
 app = FastAPI()
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+limiter = RateLimiter()
 
 load_dotenv()
 BASE_URL = os.getenv('BASE_URL')
+RATE_LIMIT, RATE_WINDOW = os.getenv('RATE_LIMIT'), os.getenv('RATE_WINDOW')
 base_url = os.getenv(f'{BASE_URL}', "http://127.0.0.1:8000/")
+
+
+@app.middleware("http")
+async def middleware(request: Request, call_next):
+    """
+    Applies rate limits to all requests if rate limit is reached.
+
+    Returns: 429 or proxied response
+    """
+    allowed, remaining = limiter.is_rate_limited(request, limit=int(RATE_LIMIT), window=int(RATE_WINDOW))
+
+    if not allowed:
+         return JSONResponse(
+              content={"error": "Rate limit exceeded"},
+              status_code=429,
+              headers={"X-RateLimit-Reset": str(RATE_WINDOW)}
+         )
+    response = await call_next(request)
+    response.headers["X-RateLimit-Remaining"] = str(RATE_LIMIT)
+    return response
 
 
 def get_redis():
