@@ -6,7 +6,7 @@ import hashlib
 import datetime
 from http.client import HTTPException
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi import FastAPI, HTTPException, Depends, Request, Body
 from rate_limiter import RateLimiter
 from starlette.responses import RedirectResponse
 from fastapi.responses import JSONResponse
@@ -17,7 +17,7 @@ limiter = RateLimiter()
 
 load_dotenv()
 BASE_URL = os.getenv('BASE_URL')
-RATE_LIMIT, RATE_WINDOW = os.getenv('RATE_LIMIT'), os.getenv('RATE_WINDOW')
+RATE_LIMIT, RATE_WINDOW = os.getenv('RATE_LIMIT') if not os.getenv('LOAD_TEST') else 100000, os.getenv('RATE_WINDOW')
 base_url = os.getenv(f'{BASE_URL}', "http://127.0.0.1:8000/")
 
 
@@ -58,8 +58,9 @@ def hash_url(url: str):
      b64 = base64.urlsafe_b64encode(digest).decode()
      return b64[:6].strip("=")
 
+
 @app.get("/api/urls/{url_code}")
-def get_url_metadata(url_code: str):
+def get_url_metadata(url_code):
      """  Retrieves URL metadata
 
           Returns:
@@ -76,8 +77,10 @@ def get_url_metadata(url_code: str):
           "expiry_time": str(datetime.timedelta(seconds=r.ttl(f"{url_code}:url"))),
           }
 
+
+
 @app.post("/shorten")
-def shorten_url(url: str):
+def shorten_url(url: str = Body(..., embed=True)):
      """
      Shortens a URL with a 24-hour expiry
 
@@ -86,6 +89,7 @@ def shorten_url(url: str):
      str: Shortened URL
      str: URL hash
      """
+
      if not validators.url(url):
           raise HTTPException(status_code=400, detail="Invalid URL")
      url_code = hash_url(url)
@@ -112,6 +116,3 @@ def redirect(url_code: str, r: redis.Redis = Depends(get_redis)):
 
      r.incr(f"{url_code}:clicks")
      return RedirectResponse(r.get(f"{url_code}:url"))
-
-
-
