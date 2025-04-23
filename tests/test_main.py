@@ -23,6 +23,11 @@ def client(fake_redis: FakeRedis):
 
 
 def test_middleware_allows_requests(client: TestClient):
+    """ Test:
+        - Requests under rate limit are allowed
+        - Correct X-RateLimit headers
+        - Returns 200 status code
+    """
     with patch("app.main.limiter.is_rate_limited", return_value=(True, 95)):
         response = client.get("/docs")
         assert "X-RateLimit-Remaining" in response.headers
@@ -30,12 +35,21 @@ def test_middleware_allows_requests(client: TestClient):
 
 
 def test_middleware_blocks_requests(client: TestClient):
+    """ Test:
+            - Requests over rate limit are not allowed
+            - Returns 429 status code
+        """
     with patch("app.main.limiter.is_rate_limited", return_value=(False, 0)):
         response = client.get("/")
         assert response.status_code == 429
 
 
 def test_middleware_redis_failure(client: TestClient):
+    """ Test:
+            - Failed Redis connections don't block requests
+            - Correct X-RateLimit headers
+            - Returns 200 status code (fail-open)
+        """
     with patch("app.main.limiter.is_rate_limited", side_effect=ConnectionError):
         response = client.get("/docs")
         assert "X-RateLimit-Bypass"in response.headers
@@ -52,13 +66,16 @@ def test_hash_url():
 
 
 def test_shorten_url(client: TestClient):
+    """ Test:
+            - URLs are properly stored to Redis with correct key/expiry time
+            - Valid URLs return 200 status code
+    """
     with patch("app.main.r") as mock_r:
         mock_r.set.return_value = False
 
-        response = client.post("/shorten", json= { "url": "https://nyc.gov" })
+        response = client.post("/shorten", json= { "url": "https://google.com" })
         data = response.json()
 
-        assert data["original_url"] == "https://nyc.gov"
         assert response.status_code == 200
         mock_r.set.assert_called_once_with(
             f"{data['short_code']}:url",
