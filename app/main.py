@@ -7,7 +7,7 @@ import datetime
 from http.client import HTTPException
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Depends, Request, Body
-from rate_limiter import RateLimiter
+from app.rate_limiter import RateLimiter
 from starlette.responses import RedirectResponse
 from fastapi.responses import JSONResponse
 
@@ -25,10 +25,16 @@ base_url = os.getenv(f'{BASE_URL}', "http://127.0.0.1:8000/")
 async def middleware(request: Request, call_next):
     """
     Applies rate limits to all requests if rate limit is reached.
+    Bypass rate limits if there is a connection error with Redis.
 
     Returns: 429 or proxied response
     """
-    allowed, remaining = limiter.is_rate_limited(request, limit=int(RATE_LIMIT), window=int(RATE_WINDOW))
+    try:
+         allowed, remaining = limiter.is_rate_limited(request, limit=int(RATE_LIMIT), window=int(RATE_WINDOW))
+    except ConnectionError:
+         response = await call_next(request)
+         response.headers["X-RateLimit-Bypass"] = "Redis Failure"
+         return response
 
     if not allowed:
          return JSONResponse(
@@ -37,7 +43,7 @@ async def middleware(request: Request, call_next):
               headers={"X-RateLimit-Reset": str(RATE_WINDOW)}
          )
     response = await call_next(request)
-    response.headers["X-RateLimit-Remaining"] = str(RATE_LIMIT)
+    response.headers["X-RateLimit-Remaining"] = str(remaining)
     return response
 
 
@@ -60,7 +66,7 @@ def hash_url(url: str):
 
 
 @app.get("/api/urls/{url_code}")
-def get_url_metadata(url_code):
+def get_url_metadata(url_code: str):
      """  Retrieves URL metadata
 
           Returns:
@@ -78,7 +84,6 @@ def get_url_metadata(url_code):
           }
 
 
-
 @app.post("/shorten")
 def shorten_url(url: str = Body(..., embed=True)):
      """
@@ -93,13 +98,12 @@ def shorten_url(url: str = Body(..., embed=True)):
      if not validators.url(url):
           raise HTTPException(status_code=400, detail="Invalid URL")
      url_code = hash_url(url)
-     new_url = base_url + url_code
 
-     if r.set(f"{url_code}:url", url, nx=True, ex=60 * 60 * 24):
-          pass
+     r.set(f"{url_code}:url", url, nx=True, ex=60 * 60 * 24)
+
      return {
           "original_url": url,
-          "short_url": new_url,
+          "short_url": base_url + url_code,
           "short_code": url_code,
      }
 
