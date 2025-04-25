@@ -1,9 +1,4 @@
-<img src="https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white" />
-<img src="https://img.shields.io/badge/FastAPI-005571?logo=fastapi" />
-<img src="https://img.shields.io/badge/redis-%23DD0031.svg?logo=redis&logoColor=white" />
-<img src="https://img.shields.io/badge/Pytest-0A9EDC?logo=pytest&logoColor=white" />
-<img src="https://img.shields.io/badge/coverage-95%25-brightgreen" />
-<img src="https://img.shields.io/badge/k6-7D64FF?logo=k6&logoColor=white" />
+<img src="https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white" /> <img src="https://img.shields.io/badge/FastAPI-005571?logo=fastapi" /> <img src="https://img.shields.io/badge/redis-%23DD0031.svg?logo=redis&logoColor=white" /> <img src="https://img.shields.io/badge/Pytest-0A9EDC?logo=pytest&logoColor=white" /><img src="https://img.shields.io/badge/coverage-95%25-brightgreen" /> <img src="https://img.shields.io/badge/k6-7D64FF?logo=k6&logoColor=white" />
 
 # URL-Shortener (FastAPI + Redis)
 
